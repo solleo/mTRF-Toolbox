@@ -88,6 +88,9 @@ function [stats,t] = mTRFcrossval(stim,resp,fs,Dir,tmin,tmax,lambda,varargin)
 %       'verbose'   A numeric or logical specifying whether to execute in
 %                   verbose mode: pass in 1 for verbose mode (default), or
 %                   0 for non-verbose mode.
+%[SG]   'band'      A numeric vector specifying the number of features in
+%                   each band. e.g. [16 1] for 16 cochleogram and 1
+%                   semantic distance. default = [all variables]
 %
 %   Notes:
 %   Each iteration of MTRFCROSSVAL partitions the N trials or segments of
@@ -157,7 +160,11 @@ delta = 1/fs;
 % Get dimensions
 xvar = unique(xvar);
 yvar = unique(yvar);
-nreg = numel(lambda);
+if isempty(arg.band)
+  arg.band = xvar;
+end
+lambdaset = makelambdaset(lambda, arg.band);
+nreg = size(lambdaset,1);
 nfold = numel(x);
 switch arg.type
     case 'multi'
@@ -233,13 +240,14 @@ for i = 1:nfold
     end
     
     for j = 1:nreg
+      L = lambdamat(nvar,xvar,lambdaset(j,:),arg.band);
         
         switch arg.type
             
             case 'multi'
                 
                 % Fit linear model
-                w = (Cxxi + lambda(j)*M)\Cxyi;
+                w = (Cxxi + L.*M)\Cxyi;
                 
                 % Predict output
                 pred = xlag*w;
@@ -257,7 +265,7 @@ for i = 1:nfold
                     idx = [1,xvar*(k-1)+2:xvar*k+1];
                     
                     % Fit linear model
-                    w = (Cxxi(:,:,k) + lambda(j)*M)\Cxyi(:,:,k);
+                    w = (Cxxi(:,:,k) + L.*M)\Cxyi(:,:,k);
                     
                     % Predict output
                     pred = xlag(:,idx)*w;
@@ -281,7 +289,7 @@ for i = 1:nfold
 end
 
 % Format output arguments
-stats = struct('r',r,'err',err);
+stats = struct('r',r,'err',err,'lambdaset',lambdaset);
 if nargout > 1
     t = lags/fs*1e3;
 end
@@ -360,6 +368,12 @@ addParameter(p,'method','ridge',validFcn);
 lagOptions = {'multi','single'};
 validFcn = @(x) any(validatestring(x,lagOptions));
 addParameter(p,'type','multi',validFcn);
+
+% Band
+errorMsg = 'It must be a numeric.';
+validFcn = @(x) assert(isnumeric(x),errorMsg);
+addParameter(p,'band',[],validFcn);
+
 
 % Correlation metric
 corrOptions = {'Pearson','Spearman'};

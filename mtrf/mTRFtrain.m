@@ -66,6 +66,9 @@ function model = mTRFtrain(stim,resp,fs,Dir,tmin,tmax,lambda,varargin)
 %       'verbose'   A numeric or logical specifying whether to execute in
 %                   verbose mode: pass in 1 for verbose mode (default), or
 %                   0 for non-verbose mode.
+%[SG]   'band'      A numeric vector specifying the number of features in
+%                   each band. e.g. [16 1] for 16 cochleogram and 1
+%                   semantic distance. default = [all variables]
 %
 %   See also RIDGE, REGRESS, MTRFTRANSFORM, MTRFCROSSVAL.
 %
@@ -127,6 +130,9 @@ delta = 1/fs;
 nlag = numel(lags);
 xvar = unique(xvar);
 yvar = unique(yvar);
+if isempty(arg.band)
+  arg.band = xvar;
+end
 switch arg.type
     case 'multi'
         nvar = xvar*nlag+1;
@@ -148,7 +154,8 @@ if arg.verbose
 end
 
 % Set up sparse regularization matrix
-M = regmat(nvar,arg.method)*lambda/delta;
+L = lambdamat(nvar,xvar,lambda,arg.band);
+M = regmat(nvar,arg.method).*L/delta;
 
 % Fit linear model
 switch arg.type
@@ -199,8 +206,8 @@ elseif ~isnumeric([tmin,tmax]) || ~isscalar(tmin) || ~isscalar(tmax)
     error('TMIN and TMAX arguments must be numeric scalars.')
 elseif tmin > tmax
     error('The value of TMIN must be less than that of TMAX.')
-elseif ~isnumeric(lambda) || ~isscalar(lambda) || lambda < 0
-    error('LAMBDA argument must be a positive numeric scalar.')
+elseif ~isnumeric(lambda) || all(lambda < 0)
+    error('LAMBDA argument must be positive numeric.')
 end
 
 function arg = parsevarargin(varargin)
@@ -225,6 +232,11 @@ addParameter(p,'method','ridge',validFcn);
 lagOptions = {'multi','single'};
 validFcn = @(x) any(validatestring(x,lagOptions));
 addParameter(p,'type','multi',validFcn);
+
+% Band
+errorMsg = 'It must be a numeric.';
+validFcn = @(x) assert(isnumeric(x),errorMsg);
+addParameter(p,'band',[],validFcn);
 
 % Split data
 errorMsg = 'It must be a positive integer scalar.';
