@@ -144,9 +144,9 @@ end
 % Format model weights
 switch model.type
     case 'multi'
-        model.w = [model.b;reshape(model.w,[xvar*numel(lags),yvar])]*delta;
+        model.w = [model.b;reshape(model.w,[xvar*numel(lags),yvar])]*sqrt(delta);
     case 'single'
-        model.w = [model.b;model.w]*delta;
+        model.w = [model.b;model.w]*sqrt(delta);
 end
 
 % Initialize variables
